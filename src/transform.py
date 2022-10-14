@@ -1,7 +1,7 @@
 import tempfile
 from collections import defaultdict
 from os import makedirs
-from os.path import abspath, basename, join
+from os.path import abspath, basename, isfile, join
 from re import finditer, sub
 from typing import Dict, Iterable, List, Optional, Tuple
 import subprocess
@@ -9,11 +9,39 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from Bio import Phylo
 from Bio.SeqIO import parse
-
+from tempfile import NamedTemporaryFile
 
 from utils import (darken_color, file, get_sample_name_and_extenstion, pushd,
                    run, string_to_color, write_fasta)
 
+
+# Convert a FASTA with line breaks in sequences to 2 rows per record
+def unwrap_fasta(wrapped_fasta: str, unwrapped_fasta: str) -> None:
+    with open(unwrapped_fasta, 'wt') as f:
+        f.write(''.join(f'>' + r.description + '\n' + str(r.seq) + '\n' for r in parse(wrapped_fasta, 'fasta')))
+
+# Create a FASTA of the CDS region from genes
+def extract_cds(genomic_fasta: str, gff: str, out_dir: str) -> str:
+    sample_name, sample_ext = get_sample_name_and_extenstion(genomic_fasta, 'fasta')
+    cds_fasta = join(out_dir, f'{sample_name}_cds{sample_ext}')
+    with NamedTemporaryFile() as wrapped_cds_temp_file:
+        run(['gffread', '-x', wrapped_cds_temp_file.name, '-g', genomic_fasta, gff])
+        unwrap_fasta(wrapped_cds_temp_file.name, cds_fasta)
+    return cds_fasta
+
+# sample.fa  =>  sample_concat.fa
+# >foo           >sample   
+# ATGATCG        ATGATCGGCTGATC
+# >bar      
+# GCTGATC       
+def fasta_concat(fasta_path: str, out_dir: str) -> str:
+    sample_name, sample_ext = get_sample_name_and_extenstion(fasta_path, 'fasta')
+    fasta_concat_path = join(out_dir, f'{sample_name}_concat{sample_ext}')
+    for suffix_to_drop in ['_cds', '_exons']:
+        if sample_name.endswith(suffix_to_drop):
+            sample_name = sample_name[:-len(suffix_to_drop)]
+    write_fasta({sample_name: ''.join(str(r.seq) for r in parse(fasta_path, 'fasta'))}, fasta_concat_path)
+    return fasta_concat_path
 
 # Make a pileup and return the path to it
 def reads_to_pileup(
@@ -266,9 +294,10 @@ def snp_ratios_to_snp_freq(
                 f_out.write(snp_freq_row + '\n')
 
 
-def reads_to_consensus(
+def reads_to_cds_concat(
     fastq: str,
     reference: str,
+    gff: str,
     out_dir: str,
     min_snp_depth: int = 20,
     min_match_depth: int = 2,
@@ -282,7 +311,9 @@ def reads_to_consensus(
         pileup, reference, out_dir, min_snp_depth,
         min_match_depth, hetero_min, hetero_max
     )
-    return consensus
+    cds = extract_cds(consensus, gff, out_dir)
+    cds_concat = fasta_concat(cds, out_dir)
+    return cds_concat
 
 
 def reads_to_fastqc(fastq: str, out_dir: str) -> Tuple[str, str]:
@@ -334,9 +365,13 @@ def create_empty_config_required_for_gene_coverage_mqc(sample: str, out_dir: str
     with open(join(out_dir, f'{config_name}.yaml'), 'w') as f:
         f.write(f'id: "{config_name}"' + '\n')
 
-def sample_report(sample_dir: str):
-    sample_name = basename(sample_dir)
+def sample_report(sample_dir: str, sample_name: str):
     out_dir = join(sample_dir, 'report')
+    for fastq_ext in ['.fastq', '.fastq.gz', '.fq', '.fq.gz']:
+        fastq_path = join(sample_dir, f'{sample_name}{fastq_ext}')
+        if isfile(fastq_path):
+            reads_to_fastqc(fastq_path, out_dir)
+            break
     # TODO: make this more flexible
     reads_to_fastqc(join(sample_dir, f'{sample_name}.fastq'), out_dir)
     alignment_to_flagstat(join(sample_dir, f'{sample_name}.bam'), out_dir)
@@ -344,9 +379,10 @@ def sample_report(sample_dir: str):
     create_empty_config_required_for_gene_coverage_mqc(sample_name, out_dir)
 
 
-def reads_list_to_consensus_with_report(
+def reads_list_to_cds_concat_with_report(
     fastq_paths: List[str],
     reference: str,
+    gff: str,
     out_dirs: List[str],
     multiqc_config: str,
     threads=1,
@@ -355,15 +391,16 @@ def reads_list_to_consensus_with_report(
     for fastq_index, (fastq, out_dir) in enumerate(zip(fastq_paths, out_dirs)):
         sample_name = get_sample_name_and_extenstion(fastq, 'fastq')[0]
         print(f'{fastq_index + 1}/{len(fastq_paths)} {sample_name}:', end=' ', flush=True)
-        reads_to_consensus(
+        reads_to_cds_concat(
             fastq=fastq,
             reference=reference,
+            gff=gff,
             out_dir=out_dir,
             threads=threads,
             trim=trim,
         )
         print('assessing', flush=True)
-        sample_report(out_dir)
+        sample_report(out_dir, sample_name)
     print('Report: compiling')
     report_dirs = [join(out_dir, 'report') for out_dir in out_dirs]
     run(['multiqc', '--config', multiqc_config] + report_dirs, out='/dev/null')
