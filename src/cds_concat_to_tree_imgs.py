@@ -23,7 +23,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--start',
         help='Starting tree input, i.e. concatenated CDS file for previously sequenced samples',
-        default=join(data_dir, '72_samples_205_genes_cds.fa')
+        default=join(data_dir, '72_samples_205_genes_cds.fa.gz')
     )
     parser.add_argument('--name', help='Name to use as a prefix for all created tree files',)
     parser.add_argument('--out_dir', help='Directory to create tree files in', default=realpath('.'))
