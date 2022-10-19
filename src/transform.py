@@ -6,6 +6,7 @@ from re import finditer, sub
 from typing import Dict, Iterable, List, Optional, Tuple
 import subprocess
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 from Bio import Phylo
 from Bio.SeqIO import parse
@@ -375,7 +376,83 @@ def create_empty_config_required_for_gene_coverage_mqc(sample: str, out_dir: str
     with open(join(out_dir, f'{config_name}.yaml'), 'w') as f:
         f.write(f'id: "{config_name}"' + '\n')
 
-def sample_report(sample_dir: str, sample_name: str):
+
+def pileup_to_gene_depths(pileup_path: str, ref_path: str) -> dict:
+    depths = {r.id: [0 for _ in r.seq] for r in parse(ref_path, 'fasta')}
+    with open(pileup_path) as f:
+        for line in f:
+            gene, pos, _, depth, *_ = line.split()
+            depths[gene][int(pos) - 1] = int(depth)
+    return depths
+    
+def gene_depths_to_amplicon_depths(gene_depths: dict, primers: pd.DataFrame) -> dict:
+    amplicon_depths = {}
+    for gene, l_pad, r_pad in primers[['gene', 'l_boundary_padding', 'r_boundary_padding']].values:
+        if gene not in gene_depths:
+            continue
+        depths = gene_depths[gene]
+        amplicon_depths[gene] = depths[l_pad: len(depths) - r_pad]
+    return amplicon_depths
+
+def pileup_to_amplicon_depths(pileup_path: str, ref_path: str, primers: pd.DataFrame) -> dict:
+    gene_depths = pileup_to_gene_depths(pileup_path, ref_path)
+    amplicon_depths = gene_depths_to_amplicon_depths(gene_depths, primers)
+    return amplicon_depths
+
+def amplicon_report(
+    pileup_path: str,
+    ref_path: str,
+    primers_path: str,
+    pooled_path: str,
+    out_dir: str,
+) -> None:
+    sample_name, ext = get_sample_name_and_extenstion(pileup_path, 'pileup')
+
+    primers = pd.read_csv(primers_path)
+    pooled = pd.read_excel(pooled_path)
+    pooled['gene'] = pooled['name'].str.split('_v', expand=True)[0]
+    amplicon_depths = pileup_to_amplicon_depths(pileup_path, ref_path, primers)
+
+    rows = []
+    for gene, depths in amplicon_depths.items():
+        depths = np.array(depths)
+        rows.append({
+            'gene': gene,
+            'amplicon_size': len(depths),
+            'median_depth': np.median(depths),
+            'mean_depth': np.mean(depths),
+            'n_ge_2x': (depths >= 2).sum(),
+            'n_ge_10x': (depths >= 10).sum(),
+            'n_ge_20x': (depths >= 20).sum(),
+        })
+    amplicon_depth_stats = pd.DataFrame(rows)
+    amplicon_depth_stats = pd.merge(
+        pooled[['name', 'gene', 'pool']],
+        amplicon_depth_stats,
+        on='gene'
+    )
+    amplicon_depth_stats['pool'] = 'Pool ' + amplicon_depth_stats['pool'].astype(str)
+
+    rows = []
+    for threshold in range(201):
+        rows.append({
+            'min_median_depth': threshold,
+            'amplicons': amplicon_depth_stats[amplicon_depth_stats.median_depth >= threshold].shape[0],
+        })
+    amplicon_median_depth_summary = pd.DataFrame(rows)
+    amplicon_median_depth_summary.to_csv(join(out_dir, f'{sample_name}_amplicon_median_depth.csv'), index=None, header=None)
+
+    groupby = amplicon_depth_stats.groupby('pool')
+    pool_summary = pd.DataFrame({
+        sample_name: 100 * groupby.n_ge_10x.sum() / groupby.amplicon_size.sum()
+    }).T
+    pool_summary.columns.name = None
+    pool_summary.index.name = 'Sample Name'
+    pool_summary = pool_summary.reset_index()
+    pool_summary.insert(1, 'All Pools', [100 *amplicon_depth_stats.n_ge_10x.sum() / amplicon_depth_stats.amplicon_size.sum()])
+    pool_summary.to_csv(join(out_dir, f'{sample_name}_pool_summary.csv'), index=None)
+
+def sample_report(sample_dir: str, sample_name: str, ref_path: str, primers_path: str, pooled_path: str):
     out_dir = join(sample_dir, 'report')
     for fastq_ext in ['.fastq', '.fastq.gz', '.fq', '.fq.gz']:
         fastq_path = join(sample_dir, f'{sample_name}{fastq_ext}')
@@ -387,6 +464,13 @@ def sample_report(sample_dir: str, sample_name: str):
     alignment_to_flagstat(join(sample_dir, f'{sample_name}.bam'), out_dir)
     consensus_to_coverage(join(sample_dir, f'{sample_name}.fasta'), out_dir)
     create_empty_config_required_for_gene_coverage_mqc(sample_name, out_dir)
+    amplicon_report(
+        pileup_path=join(sample_dir, f'{sample_name}.pileup'),
+        ref_path=ref_path,
+        primers_path=primers_path,
+        pooled_path=pooled_path,
+        out_dir=out_dir,
+    )
 
 
 def reads_list_to_cds_concat_with_report(
@@ -395,6 +479,8 @@ def reads_list_to_cds_concat_with_report(
     gff: str,
     out_dirs: List[str],
     multiqc_config: str,
+    primers_path: str,
+    pooled_path: str,
     threads=1,
     trim=True,
 ):
@@ -410,7 +496,7 @@ def reads_list_to_cds_concat_with_report(
             trim=trim,
         )
         print('assessing', flush=True)
-        sample_report(out_dir, sample_name)
+        sample_report(out_dir, sample_name, reference, primers_path, pooled_path)
     print('Report: compiling')
     report_dirs = [join(out_dir, 'report') for out_dir in out_dirs]
     run(['multiqc', '--config', multiqc_config] + report_dirs, out='/dev/null')

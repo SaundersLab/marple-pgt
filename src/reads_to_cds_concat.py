@@ -30,6 +30,16 @@ if __name__ == '__main__':
         help='MultiQC config file for creating the report',
         default=join(marple_dir, 'config', 'multiqc_config.yaml'),
     )
+    parser.add_argument(
+        '--primers',
+        help='Primers CSV with gene name and l_boundary_padding and r_boundary_padding',
+        default=join(marple_dir, 'data', 'primers', '288_primers.csv'),
+    )
+    parser.add_argument(
+        '--pooled',
+        help='Primers spreadsheet with primer name e.g. PGTG_12391_v2 and pool column',
+        default=join(marple_dir, 'data', 'primers', '205_pairs.xlsx'),
+    )
     parser.add_argument('--threads', type=int, help='Number of threads to use', default=2)
     parser.add_argument('--trim', help='Should FASTQ files be trimmed (yes/no)', default='yes')
     args = parser.parse_args()
@@ -41,6 +51,8 @@ if __name__ == '__main__':
         gff=args.gff,
         out_dirs=out_dirs,
         multiqc_config=args.multiqc_config,
+        primers_path=args.primers,
+        pooled_path=args.pooled,
         threads=args.threads,
         trim=args.trim.lower().startswith('y'),
     )

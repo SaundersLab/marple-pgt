@@ -1,19 +1,56 @@
 show_analysis_paths: False
 show_analysis_time: False
 intro_text: False
+extra_fn_clean_trim:
+  - "_amplicon_median_depth"
 custom_data:
-  gene_coverage:
+  amplicon_median_depth:
     file_format: "csv"
-    section_name: "Gene Coverage"
+    section_name: "Amplicon Median Depth"
     plot_type: "linegraph"
+    use_filename_as_sample_name: false
     pconfig:
-      id: "gene_coverage_lineplot"
-      title: "Gene Coverage"
-      ylab: "Genes"
-      xlab: "% Positions Covered"
+      id: "amplicon_median_depth_lineplot"
+      title: "Amplicon Median Depth"
+      ylab: "Amplicons"
+      xlab: "Minimum Median Depth"
       ymax: 205
       ymin: 0
-      tt_label: "{point.y} genes have ≥ {point.x}% positions covered"
+      xmax: 60
+      xmin: 0
+      tt_label: "{point.y} amplicons have median depth ≥ {point.x}"
+  "Amplicon positions with ≥ 10x depth":
+    file_format: "csv"
+    id: "Amplicon positions with ≥ 10x depth"
+    plot_type: "generalstats"
+    pconfig:
+      - "All Pools":
+          max: 100
+          min: 0
+          scale: "RdYlGn"
+          suffix: "%"
+          placement: 20
+      - "Pool 1":
+          max: 100
+          min: 0
+          scale: "RdYlGn"
+          suffix: "%"
+          placement: 21
+      - "Pool 2":
+          max: 100
+          min: 0
+          scale: "RdYlGn"
+          suffix: "%"
+          placement: 22
+      - "Pool 3":
+          max: 100
+          min: 0
+          scale: "RdYlGn"
+          suffix: "%"
+          placement: 23
 sp:
-  gene_coverage:
-    fn: "*.csv"
+  amplicon_median_depth:
+    fn: "*_amplicon_median_depth.csv"
+  "Amplicon positions with ≥ 10x depth":
+    fn: "*_pool_summary.csv"
+
