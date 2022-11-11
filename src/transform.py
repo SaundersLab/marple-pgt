@@ -44,15 +44,33 @@ def fasta_concat(fasta_path: str, out_dir: str) -> str:
     # TODO: figrue out why these CDS are a different length to the existing 
     #       tree input consensus files
     temp_fixes = {
-        'PGTG_15111': 'N' * 1655,
-        'PGTG_20345': 'N' * 1631,
+        'rna4054': 'N' * 1655,
+        'rna16319': 'N' * 1631,
+        'rna4229': 'N' * 1143,
     }
     seq = ''.join(
         temp_fixes.get(r.id, str(r.seq))
         for r in parse(fasta_path, 'fasta')
+        # exclude the fungicide genes
+        if r.id not in {'mRNA_9243', 'mRNA_44', 'mRNA_1581', 'mRNA_9290'}
     )
     write_fasta({sample_name: seq}, fasta_concat_path)
     return fasta_concat_path
+
+def filter_read_length(
+    fastq_in: str,
+    fastq_out: str,
+    max_read_length: int = 4_000,
+) -> None:
+    with open(fastq_in) as f_in, open(fastq_out, 'wt') as f_out:
+        for i, line in enumerate(f_in):
+            if (i % 4) == 0: # sequence identifier line
+                if i > 0 and read_length <= max_read_length:
+                    f_out.write(record)
+                record = ''
+            elif (i % 4) == 1: # sequence letters line
+                read_length = len(line.strip())
+            record += line
 
 # Make a pileup and return the path to it
 def reads_to_pileup(
@@ -61,6 +79,7 @@ def reads_to_pileup(
     out_dir: str,
     threads=1,
     trim=True,
+    max_read_length: int = 4_000,
 ) -> str:
     makedirs(out_dir, exist_ok=True)
     sample_name, sample_ext = get_sample_name_and_extenstion(fastq, 'fastq')
@@ -71,10 +90,13 @@ def reads_to_pileup(
         run(['porechop', '--threads', threads, '-i', fastq], trimmed)
     else:
         trimmed = fastq
+    filtered = join(out_dir, f'{sample_name}_len_le_{max_read_length}{sample_ext}')
+    print('filtering', end=' ', flush=True)
+    filter_read_length(trimmed, filtered, max_read_length)
     print('aligning', end=' ', flush=True)
     run(['bwa', 'index', reference])
     aligned_sam = join(out_dir, f'{sample_name}.sam')
-    run(['bwa', 'mem', '-t', threads, reference, trimmed], aligned_sam)
+    run(['bwa', 'mem', '-t', threads, reference, filtered], aligned_sam)
     aligned_bam = join(out_dir, f'{sample_name}_unsorted.bam')
     run(['samtools', 'view', '-@', threads, '-S', '-b', aligned_sam], aligned_bam)
     sorted_bam = join(out_dir, f'{sample_name}.bam')
@@ -316,8 +338,9 @@ def reads_to_cds_concat(
     hetero_max: float = .75,
     threads=1,
     trim=True,
+    max_read_length: int = 4_000,
 ) -> str:
-    pileup = reads_to_pileup(fastq, reference, out_dir, threads=threads, trim=trim)
+    pileup = reads_to_pileup(fastq, reference, out_dir, threads=threads, trim=trim, max_read_length=max_read_length)
     consensus = pileup_to_consensus(
         pileup, reference, out_dir, min_snp_depth,
         min_match_depth, hetero_min, hetero_max
@@ -385,14 +408,14 @@ def pileup_to_gene_depths(pileup_path: str, ref_path: str) -> dict:
             depths[gene][int(pos) - 1] = int(depth)
     return depths
     
-def gene_depths_to_amplicon_depths(gene_depths: dict, primers: pd.DataFrame) -> dict:
-    amplicon_depths = {}
-    for gene, l_pad, r_pad in primers[['gene', 'l_boundary_padding', 'r_boundary_padding']].values:
-        if gene not in gene_depths:
-            continue
-        depths = gene_depths[gene]
-        amplicon_depths[gene] = depths[l_pad: len(depths) - r_pad]
-    return amplicon_depths
+def gene_depths_to_amplicon_depths(
+    gene_depths: Dict[str, List[int]],
+    primers: pd.DataFrame
+) -> Dict[str, List[int]]:
+    return {
+        row['name']: gene_depths[row.gene][row.start:row.end]
+        for _, row in primers.iterrows()
+    }
 
 def pileup_to_amplicon_depths(pileup_path: str, ref_path: str, primers: pd.DataFrame) -> dict:
     gene_depths = pileup_to_gene_depths(pileup_path, ref_path)
@@ -403,56 +426,59 @@ def amplicon_report(
     pileup_path: str,
     ref_path: str,
     primers_path: str,
-    pooled_path: str,
     out_dir: str,
 ) -> None:
     sample_name, ext = get_sample_name_and_extenstion(pileup_path, 'pileup')
 
-    primers = pd.read_csv(primers_path)
-    pooled = pd.read_excel(pooled_path)
-    pooled['gene'] = pooled['name'].str.split('_v', expand=True)[0]
+    primers = pd.read_excel(primers_path)
+
     amplicon_depths = pileup_to_amplicon_depths(pileup_path, ref_path, primers)
 
     rows = []
-    for gene, depths in amplicon_depths.items():
+    for amplicon_name, depths in amplicon_depths.items():
         depths = np.array(depths)
+        n_exceeding = {
+            f'n_ge_{threshold}x': (depths >= threshold).sum()
+            for threshold in [1, 2, 5, 10, 20, 50, 100]
+        }
+        described = pd.Series(depths).describe().drop('count').to_dict()
         rows.append({
-            'gene': gene,
+            'name': amplicon_name,
             'amplicon_size': len(depths),
-            'median_depth': np.median(depths),
-            'mean_depth': np.mean(depths),
-            'n_ge_2x': (depths >= 2).sum(),
-            'n_ge_10x': (depths >= 10).sum(),
-            'n_ge_20x': (depths >= 20).sum(),
+            **n_exceeding,
+            **described,
         })
     amplicon_depth_stats = pd.DataFrame(rows)
     amplicon_depth_stats = pd.merge(
-        pooled[['name', 'gene', 'pool']],
+        primers,
         amplicon_depth_stats,
-        on='gene'
+        on='name'
     )
-    amplicon_depth_stats['pool'] = 'Pool ' + amplicon_depth_stats['pool'].astype(str)
-
+    amplicon_depth_stats['pool_name'] = 'Pool ' + amplicon_depth_stats['pool'].astype(str)
+    amplicon_depth_stats.to_excel(join(out_dir, f'{sample_name}_amplicon_stats.xlsx'), index=None)
     rows = []
     for threshold in range(201):
         rows.append({
             'min_median_depth': threshold,
-            'amplicons': amplicon_depth_stats[amplicon_depth_stats.median_depth >= threshold].shape[0],
+            'amplicons': amplicon_depth_stats[amplicon_depth_stats['50%'] >= threshold].shape[0],
         })
     amplicon_median_depth_summary = pd.DataFrame(rows)
     amplicon_median_depth_summary.to_csv(join(out_dir, f'{sample_name}_amplicon_median_depth.csv'), index=None, header=None)
 
-    groupby = amplicon_depth_stats.groupby('pool')
-    pool_summary = pd.DataFrame({
-        sample_name: 100 * groupby.n_ge_10x.sum() / groupby.amplicon_size.sum()
-    }).T
-    pool_summary.columns.name = None
-    pool_summary.index.name = 'Sample Name'
-    pool_summary = pool_summary.reset_index()
-    pool_summary.insert(1, 'All Pools', [100 *amplicon_depth_stats.n_ge_10x.sum() / amplicon_depth_stats.amplicon_size.sum()])
-    pool_summary.to_csv(join(out_dir, f'{sample_name}_pool_summary.csv'), index=None)
+    groupby = amplicon_depth_stats.groupby('pool_name')
+    for thresh in [10, 20]:
+        col = f'n_ge_{thresh}x'
+        pool_summary = pd.DataFrame({
+            sample_name: 100 * groupby[col].sum() / groupby.amplicon_size.sum()
+        }).T
+        pool_summary.rename(columns={col: f'{col} ({thresh}x)' for col in pool_summary}, inplace=True)
+        pool_summary.columns.name = None
+        pool_summary.index.name = 'Sample Name'
+        pool_summary = pool_summary.reset_index()
+        pool_summary.insert(1, f'All Pools ({thresh}x)', [100 *amplicon_depth_stats[col].sum() / amplicon_depth_stats.amplicon_size.sum()])
+        pool_summary.to_csv(join(out_dir, f'{sample_name}_ge_{thresh}x_pool_summary.csv'), index=None)
 
-def sample_report(sample_dir: str, sample_name: str, ref_path: str, primers_path: str, pooled_path: str):
+def sample_report(sample_dir: str, sample_name: str, ref_path: str, primers_path: str):
     out_dir = join(sample_dir, 'report')
     for fastq_ext in ['.fastq', '.fastq.gz', '.fq', '.fq.gz']:
         fastq_path = join(sample_dir, f'{sample_name}{fastq_ext}')
@@ -468,7 +494,6 @@ def sample_report(sample_dir: str, sample_name: str, ref_path: str, primers_path
         pileup_path=join(sample_dir, f'{sample_name}.pileup'),
         ref_path=ref_path,
         primers_path=primers_path,
-        pooled_path=pooled_path,
         out_dir=out_dir,
     )
 
@@ -480,9 +505,9 @@ def reads_list_to_cds_concat_with_report(
     out_dirs: List[str],
     multiqc_config: str,
     primers_path: str,
-    pooled_path: str,
     threads=1,
     trim=True,
+    max_read_length: int = 4_000,
 ):
     for fastq_index, (fastq, out_dir) in enumerate(zip(fastq_paths, out_dirs)):
         sample_name = get_sample_name_and_extenstion(fastq, 'fastq')[0]
@@ -494,9 +519,10 @@ def reads_list_to_cds_concat_with_report(
             out_dir=out_dir,
             threads=threads,
             trim=trim,
+            max_read_length=max_read_length,
         )
         print('assessing', flush=True)
-        sample_report(out_dir, sample_name, reference, primers_path, pooled_path)
+        sample_report(out_dir, sample_name, reference, primers_path)
     print('Report: compiling')
     report_dirs = [join(out_dir, 'report') for out_dir in out_dirs]
     run(['multiqc', '--config', multiqc_config] + report_dirs, out='/dev/null')

@@ -18,12 +18,12 @@ if __name__ == '__main__':
     parser.add_argument(
         '--ref',
         help='Reference FASTA file to align reads to',
-        default=join(reference_dir, 'crl75_205_genes.fa'),
+        default=join(reference_dir, '280_genes.fa'),
     )
     parser.add_argument(
         '--gff',
         help='Annotation file giving the position of exons within the reference genes. Genes should be specificied as if everything was on the + strand.',
-        default=join(reference_dir, 'crl75_205_genes_as_positive_strand_landmarks.gff3'),
+        default=join(reference_dir, '280_genes.gff3'),
     )
     parser.add_argument(
         '--multiqc_config',
@@ -32,16 +32,12 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         '--primers',
-        help='Primers CSV with gene name and l_boundary_padding and r_boundary_padding',
-        default=join(marple_dir, 'data', 'primers', '288_primers.csv'),
-    )
-    parser.add_argument(
-        '--pooled',
-        help='Primers spreadsheet with primer name e.g. PGTG_12391_v2 and pool column',
-        default=join(marple_dir, 'data', 'primers', '205_pairs.xlsx'),
+        help='Primers spreadhseet with gene name and l_boundary_padding and r_boundary_padding',
+        default=join(marple_dir, 'data', 'primers', '282_pairs_280_genes_3_pools.xlsx'),
     )
     parser.add_argument('--threads', type=int, help='Number of threads to use', default=2)
     parser.add_argument('--trim', help='Should FASTQ files be trimmed (yes/no)', default='yes')
+    parser.add_argument('--max_read_length', type=int, help='Maxmium length of read in FASTQ to keep', default=4_000)
     args = parser.parse_args()
     fastq_paths = [realpath(path) for path in args.relative_fastq_paths]
     out_dirs = [dirname(path) for path in fastq_paths]
@@ -52,7 +48,7 @@ if __name__ == '__main__':
         out_dirs=out_dirs,
         multiqc_config=args.multiqc_config,
         primers_path=args.primers,
-        pooled_path=args.pooled,
         threads=args.threads,
         trim=args.trim.lower().startswith('y'),
+        max_read_length=args.max_read_length,
     )
