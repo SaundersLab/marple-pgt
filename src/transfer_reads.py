@@ -29,6 +29,8 @@ for barcode_dir in barcode_dirs:
 
 for barcode_dir in barcode_dirs:
     barcode = os.path.basename(barcode_dir)
+    if barcode not in barcodes:
+        continue
     sample = barcodes[barcode]
     out_dir = experiment + '/' + sample
     os.makedirs(out_dir, exist_ok=True)
