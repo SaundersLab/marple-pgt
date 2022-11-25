@@ -8,7 +8,10 @@ if __name__ == '__main__':
     data_dir = join(marple_dir, 'data')
     reference_dir = join(data_dir, 'reference')
 
-    parser = argparse.ArgumentParser(description='Align reads to reference genes then extract and concatenate CDS')
+    parser = argparse.ArgumentParser(
+        description='Align reads to reference genes then extract and concatenate CDS',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
     parser.add_argument(
         'relative_fastq_paths',
         type=str,
