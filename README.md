@@ -1,3 +1,9 @@
+# ⚠️ Work In Progress
+
+### This pipeline currently contains bugs that will give inaccurate results.
+
+### It is only suitable for testing and development until those bugs are fixed.
+
 # marple-pgt
 Pipeline for analysis of Puccinia graminis f. sp. tritici genomic reads
 
