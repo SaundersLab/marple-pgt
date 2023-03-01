@@ -1,3 +1,6 @@
+marple_pgt_miniconda
+install/marple_pgt_miniconda.sh
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
