@@ -19,6 +19,17 @@ custom_data:
       xmax: 60
       xmin: 0
       tt_label: "{point.y} amplicons have median depth ≥ {point.x}"
+  "Fungicide Target Genes":
+    file_format: "tsv"
+    id: "Fungicide Target Genes"
+    plot_type: "generalstats"
+    pconfig:
+      - "Amino Acid Changes":
+          format: "{:,.0f}"
+      - "Codons With SNPs":
+          format: "{:,.0f}"
+      - "SNPs Outside CDS":
+          format: "{:,.0f}"
   "Amplicon positions with ≥ 10x depth":
     file_format: "csv"
     id: "Amplicon positions with ≥ 10x depth"
@@ -92,6 +103,8 @@ custom_data:
 sp:
   amplicon_median_depth:
     fn: "*_amplicon_median_depth.csv"
+  "Fungicide Target Genes":
+    fn: "*_snp_summary.tsv"
   "Amplicon positions with ≥ 10x depth":
     fn: "*10x_pool_summary.csv"
   "Amplicon positions with ≥ 20x depth":

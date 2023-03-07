@@ -11,6 +11,7 @@ import pandas as pd
 from Bio import Phylo
 from Bio.SeqIO import parse
 from tempfile import NamedTemporaryFile
+from fungicide_target_analysis import fungicide_target_analysis
 
 from utils import (darken_color, file, get_sample_name_and_extenstion, pushd,
                    run, string_to_color, write_fasta)
@@ -344,6 +345,17 @@ def reads_to_cds_concat(
     consensus = pileup_to_consensus(
         pileup, reference, out_dir, min_snp_depth,
         min_match_depth, hetero_min, hetero_max
+    )
+    sample_name, _ = get_sample_name_and_extenstion(fastq, 'fastq')
+    report_dir = join(out_dir, 'report')
+    makedirs(report_dir, exist_ok=True)
+    fungicide_target_analysis(
+        reference=reference,
+        gff_path=gff,
+        consensus=consensus,
+        cds_diffs_out=join(report_dir, f'{sample_name}_cds_diffs.tsv'),
+        non_cds_diffs_out=join(report_dir, f'{sample_name}_non_cds_diffs.tsv'),
+        snp_summary_out=join(report_dir, f'{sample_name}_snp_summary.tsv'),
     )
     cds = extract_cds(consensus, gff, out_dir)
     cds_concat = fasta_concat(cds, out_dir)
