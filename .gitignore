@@ -1,6 +1,9 @@
 marple_pgt_miniconda
 install/marple_pgt_miniconda.sh
 
+# index files
+data/reference/280_genes.fa.*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
