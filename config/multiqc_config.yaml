@@ -30,6 +30,45 @@ custom_data:
           format: "{:,.0f}"
       - "SNPs Outside CDS":
           format: "{:,.0f}"
+  "Amplicon positions with ≥ 2x depth":
+    file_format: "csv"
+    id: "Amplicon positions with ≥ 2x depth"
+    plot_type: "generalstats"
+    pconfig:
+      - "All Pools (2x)":
+          max: 100
+          min: 0
+          scale: "RdYlGn"
+          suffix: "%"
+          placement: 15
+      - "Pool 1 (2x)":
+          max: 100
+          min: 0
+          scale: "RdYlGn"
+          suffix: "%"
+          placement: 16
+          hidden: true
+      - "Pool 2 (2x)":
+          max: 100
+          min: 0
+          scale: "RdYlGn"
+          suffix: "%"
+          placement: 17
+          hidden: true
+      - "Pool 3 (2x)":
+          max: 100
+          min: 0
+          scale: "RdYlGn"
+          suffix: "%"
+          placement: 18
+          hidden: true
+      - "Pool 4 (2x)":
+          max: 100
+          min: 0
+          scale: "RdYlGn"
+          suffix: "%"
+          placement: 19
+          hidden: true
   "Amplicon positions with ≥ 10x depth":
     file_format: "csv"
     id: "Amplicon positions with ≥ 10x depth"
@@ -41,30 +80,35 @@ custom_data:
           scale: "RdYlGn"
           suffix: "%"
           placement: 20
+          hidden: true
       - "Pool 1 (10x)":
           max: 100
           min: 0
           scale: "RdYlGn"
           suffix: "%"
           placement: 21
+          hidden: true
       - "Pool 2 (10x)":
           max: 100
           min: 0
           scale: "RdYlGn"
           suffix: "%"
           placement: 22
+          hidden: true
       - "Pool 3 (10x)":
           max: 100
           min: 0
           scale: "RdYlGn"
           suffix: "%"
           placement: 23
+          hidden: true
       - "Pool 4 (10x)":
           max: 100
           min: 0
           scale: "RdYlGn"
           suffix: "%"
           placement: 24
+          hidden: true
   "Amplicon positions with ≥ 20x depth":
     file_format: "csv"
     id: "Amplicon positions with ≥ 20x depth"
@@ -82,31 +126,36 @@ custom_data:
           scale: "RdYlGn"
           suffix: "%"
           placement: 26
+          hidden: true
       - "Pool 2 (20x)":
           max: 100
           min: 0
           scale: "RdYlGn"
           suffix: "%"
           placement: 27
+          hidden: true
       - "Pool 3 (20x)":
           max: 100
           min: 0
           scale: "RdYlGn"
           suffix: "%"
           placement: 28
+          hidden: true
       - "Pool 4 (20x)":
           max: 100
           min: 0
           scale: "RdYlGn"
           suffix: "%"
           placement: 29
+          hidden: true
 sp:
   amplicon_median_depth:
     fn: "*_amplicon_median_depth.csv"
   "Fungicide Target Genes":
     fn: "*_snp_summary.tsv"
+  "Amplicon positions with ≥ 2x depth":
+    fn: "*2x_pool_summary.csv"
   "Amplicon positions with ≥ 10x depth":
     fn: "*10x_pool_summary.csv"
   "Amplicon positions with ≥ 20x depth":
     fn: "*20x_pool_summary.csv"
-

@@ -478,7 +478,7 @@ def amplicon_report(
     amplicon_median_depth_summary.to_csv(join(out_dir, f'{sample_name}_amplicon_median_depth.csv'), index=None, header=None)
 
     groupby = amplicon_depth_stats.groupby('pool_name')
-    for thresh in [10, 20]:
+    for thresh in [2, 10, 20]:
         col = f'n_ge_{thresh}x'
         pool_summary = pd.DataFrame({
             sample_name: 100 * groupby[col].sum() / groupby.amplicon_size.sum()
