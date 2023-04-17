@@ -36,7 +36,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--primers',
         help='Primers spreadhseet with gene name and l_boundary_padding and r_boundary_padding',
-        default=join(marple_dir, 'data', 'primers', '282_pairs_280_genes_3_pools.xlsx'),
+        default=join(marple_dir, 'data', 'primers', '282_pairs_280_genes_4_pools.xlsx'),
     )
     parser.add_argument('--threads', type=int, help='Number of threads to use', default=2)
     parser.add_argument('--trim', help='Should FASTQ files be trimmed (yes/no)', default='yes')
