@@ -15,7 +15,7 @@ from fungicide_target_analysis import fungicide_target_analysis
 
 from utils import (darken_color, file, get_sample_name_and_extenstion, pushd,
                    run, string_to_color, write_fasta)
-
+import glob
 
 # Convert a FASTA with line breaks in sequences to 2 rows per record
 def unwrap_fasta(wrapped_fasta: str, unwrapped_fasta: str) -> None:
@@ -492,13 +492,16 @@ def amplicon_report(
 
 def sample_report(sample_dir: str, sample_name: str, ref_path: str, primers_path: str):
     out_dir = join(sample_dir, 'report')
-    for fastq_ext in ['.fastq', '.fastq.gz', '.fq', '.fq.gz']:
-        fastq_path = join(sample_dir, f'{sample_name}{fastq_ext}')
-        if isfile(fastq_path):
-            reads_to_fastqc(fastq_path, out_dir)
-            break
-    # TODO: make this more flexible
-    reads_to_fastqc(join(sample_dir, f'{sample_name}.fastq'), out_dir)
+    
+    # TODO: add a flag to allow unfiltered FASTQ to have a report (if it's
+    # really wanted). Currently we do not report on the original FASTQ because
+    # if there's a very (100k+) long read, it can take 20+ mins to run fastqc.
+    # Big picture solution is to either swap to a reporting tool that runs
+    # quickly even with extremely long reads, or to set fastqc running in parallel
+    # (which would we trivial if we were using a workflow engine).
+    for fastq_path in glob.glob(join(sample_dir, f'{sample_name}*_len_le*.f*q*')):
+        reads_to_fastqc(fastq_path, out_dir)
+
     alignment_to_flagstat(join(sample_dir, f'{sample_name}.bam'), out_dir)
     consensus_to_coverage(join(sample_dir, f'{sample_name}.fasta'), out_dir)
     create_empty_config_required_for_gene_coverage_mqc(sample_name, out_dir)
