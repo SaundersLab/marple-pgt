@@ -520,6 +520,7 @@ def reads_list_to_cds_concat_with_report(
     threads=1,
     trim=True,
     max_read_length: int = 4_000,
+    min_snp_depth: int = 20,
 ):
     for fastq_index, (fastq, out_dir) in enumerate(zip(fastq_paths, out_dirs)):
         sample_name = get_sample_name_and_extenstion(fastq, 'fastq')[0]
@@ -532,6 +533,7 @@ def reads_list_to_cds_concat_with_report(
             threads=threads,
             trim=trim,
             max_read_length=max_read_length,
+            min_snp_depth=min_snp_depth,
         )
         print('assessing', flush=True)
         sample_report(out_dir, sample_name, reference, primers_path)

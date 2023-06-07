@@ -8,7 +8,7 @@ marple_pgt_dir=$(cd $(dirname "$script"); pwd)
 
 "$marple_pgt_dir"/reset_example.sh
 cd "$marple_pgt_dir"/example
-../src/reads_to_cds_concat.sh --trim no */*.fastq
+../src/reads_to_cds_concat.sh --trim no --min_snp_depth 10 */*.fastq
 ../src/cds_concat_to_tree_imgs.sh \
     --start ../data/12_samples_276_genes_cds.fa.gz \
     --out_dir tree \
