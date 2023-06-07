@@ -203,7 +203,7 @@ def fungicide_target_analysis(
 
     pd.DataFrame({
         'sample': sample_name,
-        'Amino Acid Changes': (cds_diffs.synonymous != 'no').sum(),
+        'Amino Acid Changes': (cds_diffs.synonymous == 'no').sum(),
         'Codons With SNPs': cds_diffs.shape[0],
         'SNPs Outside CDS': non_cds_diffs.shape[0],
     }, index=[0]).to_csv(snp_summary_out, sep='\t', index=None)
