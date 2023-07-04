@@ -224,6 +224,7 @@ def _base_ratios_from_reads(reads: str, depth: int, ref: str) -> Dict[str, float
 def _pileup_row_to_snp_ratio_row(row: str) -> str:
     contig, pos_str, ref, depth_str, reads, *_ = row.split('\t')
     depth = int(depth_str)
+    ref = ref.upper()
     base_to_ratio = _base_ratios_from_reads(reads, depth, ref)
     # sort by base for backward compatability
     base_ratios = sorted(base_to_ratio.items(),
